@@ -10,11 +10,7 @@ struct ContentView: View {
         NavigationSplitView {
             ContactListPane()
         } content: {
-            ContentUnavailableView(
-                "互动时间线",
-                systemImage: "clock.arrow.circlepath",
-                description: Text("选择联系人后展示互动时间线")
-            )
+            InteractionsPane()
         } detail: {
             ContentUnavailableView(
                 "联系人资料",
