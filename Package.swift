@@ -6,6 +6,10 @@ let package = Package(
     platforms: [.macOS(.v14)],
     targets: [
         .target(name: "PeoplebookKit"),
+        .executableTarget(
+            name: "PeoplebookApp",
+            dependencies: ["PeoplebookKit"]
+        ),
         .testTarget(
             name: "PeoplebookKitTests",
             dependencies: ["PeoplebookKit"]
