@@ -18,7 +18,7 @@ swift test                  # 全量测试（＃域层四接缝：搜索/导入/
 ## 架构
 
 - `PeoplebookKit` —— 纯领域库：模型与层级、`Reminder`（日期计算/逾期）、`ContactSearch`（主命中 + 互动笔记次级聚合）、`CSVImporter`（UTF-8/RFC4180/去重标记）、`Repository`（SQLite，级联删除）、`MockData`（六人剧本）
-- `PeoplebookApp` —— SwiftUI 三栏（搜索列表 / 互动时间线 / 资料与关系）+ 导入预览 sheet
+- `PeoplebookApp` —— SwiftUI 两栏（搜索列表 / 单详情栏：资料卡、互动时间线、联系人间关系）+ 导入预览 sheet
 
 UI 层按规格不写自动化测试；自动化全部压在 PeoplebookKit 四个接缝上。
 
