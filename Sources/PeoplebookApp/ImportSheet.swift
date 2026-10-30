@@ -26,7 +26,7 @@ struct ImportSheet: View {
         .frame(minWidth: 680, minHeight: 480)
         .fileImporter(
             isPresented: $showingFileImporter,
-            allowedContentTypes: [UTType.commaSeparatedText, UTType.plainText],
+            allowedContentTypes: [UTType.commaSeparatedText],
             allowsMultipleSelection: false
         ) { result in
             load(from: result)
@@ -197,7 +197,7 @@ struct ImportSheet: View {
             errorMessage = "未能解析表头行。"
             candidates = []
         } catch CSVImporter.ImportError.missingNameColumn {
-            errorMessage = "表头缺少「姓名」列（必须有：姓名、电话、邮箱、公司、职位）。"
+            errorMessage = "表头缺少「姓名」列（其余列：电话、邮箱、公司、职位，均允许为空）。"
             candidates = []
         } catch {
             errorMessage = "导入失败：\(error)"

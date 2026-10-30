@@ -2,7 +2,8 @@ import Foundation
 
 /// 首版内置的 6 个固定假联系人（含所有"戏"：新鲜互动、重点逾期 40 天、
 /// 普通逾期 120 天、重点但从未互动、冰冷淡、以及一个「经介绍认识」链条）。
-public enum MockData {    public struct Seed: Sendable {
+public enum MockData {
+    public struct Seed: Sendable {
         public var contacts: [Contact]
         public var interactions: [Interaction]
         public var relationships: [Relationship]

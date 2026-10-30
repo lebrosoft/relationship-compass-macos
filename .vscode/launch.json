@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Default Project}",
+            "name": "Debug PeoplebookApp",
+            "target": "PeoplebookApp",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug PeoplebookApp"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Default Project}",
+            "name": "Release PeoplebookApp",
+            "target": "PeoplebookApp",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release PeoplebookApp"
+        }
+    ]
+}

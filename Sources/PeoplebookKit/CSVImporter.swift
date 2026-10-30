@@ -89,11 +89,12 @@ public enum CSVImporter {
     }
 
     /// 预置体验用示例 CSV（导入 sheet 可一键填入）：4 行中
-    /// 1 个跳过（陈志远）、1 个疑似重复（王芳）、2 个新增。
+    /// 1 个跳过（陈志远，姓名+电话都命中）、1 个疑似重复（王芳，姓名命中但
+    /// 电话与库中不同）、2 个新增。
     public static let sampleCSV = """
     姓名,电话,邮箱,公司,职位
     陈志远,13800000001,chen.zhiyuan@example.com,云帆科技,技术合伙人
-    王芳,,wang.fang@example.com,青竹资本,投资总监
+    王芳,13999999999,wang.fang@example.com,青竹资本,投资总监
     周雨桐,13300000011,zhou.yutong@example.com,拾光影像,摄影师
     何立群,,he.liqun@example.com,三和咨询,合伙人
     """
@@ -112,9 +113,11 @@ public enum CSVImporter {
         return parsed.rows.compactMap { row -> Candidate? in
             let name = normalized(name: value(of: row, at: column.name))
             guard !name.isEmpty else { return nil }
-            let phone = normalized(phone: value(of: row, at: column.phone))
+            // 电话保真：库里存原始串，归一化只用于去重匹配。
+            let phone = value(of: row, at: column.phone)
             let nameHit = existingNames.contains(name)
-            let phoneHit = !phone.isEmpty && existingPhones.contains(phone)
+            let phoneHit = normalized(phone: phone).isEmpty == false
+                && existingPhones.contains(normalized(phone: phone))
             return Candidate(
                 name: name,
                 phone: phone,
@@ -135,22 +138,20 @@ public enum CSVImporter {
         var title: Int = -1
     }
 
+    /// 固定五列（词汇表/规格）：姓名、电话、邮箱、公司、职位，不做别名。
     private static func columnMap(header: [String]) throws -> ColumnMap {
-        guard let name = header.firstIndex(of: "姓名") else {
+        func indexOf(_ name: String) -> Int {
+            header.firstIndex(of: name) ?? -1
+        }
+        guard indexOf("姓名") >= 0 else {
             throw ImportError.missingNameColumn
         }
-        func indexOf(_ names: [String]) -> Int {
-            for name in names {
-                if let i = header.firstIndex(of: name) { return i }
-            }
-            return -1
-        }
         return ColumnMap(
-            name: name,
-            phone: indexOf(["电话", "手机", "手机号", "电话号码"]),
-            email: indexOf(["邮箱", "电子邮件", "Email", "邮件"]),
-            company: indexOf(["公司", "单位"]),
-            title: indexOf(["职位", "职务", "头衔"])
+            name: indexOf("姓名"),
+            phone: indexOf("电话"),
+            email: indexOf("邮箱"),
+            company: indexOf("公司"),
+            title: indexOf("职位")
         )
     }
 
@@ -163,10 +164,10 @@ public enum CSVImporter {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// 电话归一化：仅保留数字，忽略空格、横线、国家码 +86。
+    /// 电话归一化（仅用于去重匹配，不落库）：仅保留数字，忽略空格、横线、+86 前缀。
     private static func normalized(phone: String) -> String {
         let digits = phone.filter(\.isNumber)
-        if digits.count > 10, digits.hasPrefix("86"), digits.count >= 11 {
+        if digits.count >= 11, digits.hasPrefix("86") {
             return String(digits.dropFirst(2))
         }
         return digits

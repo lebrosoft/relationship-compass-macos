@@ -28,20 +28,26 @@ public final class Repository: @unchecked Sendable {
         case cannotOpen(String)
         case sqlite(String)
         case notFound
+        /// 库中出现了固定清单之外的枚举值（层级/类型），拒绝静默改类。
+        case unknownEnumValue(column: String, raw: String)
     }
 
     // MARK: - 联系人
 
     /// 按主键 upsert。
     public func saveContact(_ contact: Contact) throws {
-        let exists = try scalarBool("SELECT 1 FROM contacts WHERE id = ?", [contact.id.uuidString])
-        if exists {
-            try exec(
-                """
+        try upsert(
+            table: "contacts",
+            id: contact.id,
+            updateSQL: """
                 UPDATE contacts SET name = ?, phone = ?, email = ?, company = ?,
                 title = ?, note = ?, level = ? WHERE id = ?
-                """
-            ) { stmt in
+                """,
+            insertSQL: """
+                INSERT INTO contacts (id, name, phone, email, company, title, note, level, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+            bindsUpdate: { stmt in
                 bind(stmt, 1, contact.name)
                 bind(stmt, 2, contact.phone)
                 bind(stmt, 3, contact.email)
@@ -50,14 +56,8 @@ public final class Repository: @unchecked Sendable {
                 bind(stmt, 6, contact.note)
                 bind(stmt, 7, contact.level.rawValue)
                 bind(stmt, 8, contact.id.uuidString)
-            }
-        } else {
-            try exec(
-                """
-                INSERT INTO contacts (id, name, phone, email, company, title, note, level, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
-            ) { stmt in
+            },
+            bindsInsert: { stmt in
                 bind(stmt, 1, contact.id.uuidString)
                 bind(stmt, 2, contact.name)
                 bind(stmt, 3, contact.phone)
@@ -68,7 +68,7 @@ public final class Repository: @unchecked Sendable {
                 bind(stmt, 8, contact.level.rawValue)
                 bind(stmt, 9, contact.createdAt.timeIntervalSinceReferenceDate)
             }
-        }
+        )
     }
 
     public func contact(id: UUID) throws -> Contact {
@@ -107,33 +107,29 @@ public final class Repository: @unchecked Sendable {
     // MARK: - 互动
 
     public func saveInteraction(_ interaction: Interaction) throws {
-        let exists = try scalarBool(
-            "SELECT 1 FROM interactions WHERE id = ?", [interaction.id.uuidString]
-        )
-        if exists {
-            try exec(
-                "UPDATE interactions SET contact_id = ?, kind = ?, date = ?, note = ? WHERE id = ?"
-            ) { stmt in
+        try upsert(
+            table: "interactions",
+            id: interaction.id,
+            updateSQL: "UPDATE interactions SET contact_id = ?, kind = ?, date = ?, note = ? WHERE id = ?",
+            insertSQL: """
+                INSERT INTO interactions (id, contact_id, kind, date, note)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+            bindsUpdate: { stmt in
                 bind(stmt, 1, interaction.contactID.uuidString)
                 bind(stmt, 2, interaction.kind.rawValue)
                 bind(stmt, 3, interaction.date.timeIntervalSinceReferenceDate)
                 bind(stmt, 4, interaction.note)
                 bind(stmt, 5, interaction.id.uuidString)
-            }
-        } else {
-            try exec(
-                """
-                INSERT INTO interactions (id, contact_id, kind, date, note)
-                VALUES (?, ?, ?, ?, ?)
-                """
-            ) { stmt in
+            },
+            bindsInsert: { stmt in
                 bind(stmt, 1, interaction.id.uuidString)
                 bind(stmt, 2, interaction.contactID.uuidString)
                 bind(stmt, 3, interaction.kind.rawValue)
                 bind(stmt, 4, interaction.date.timeIntervalSinceReferenceDate)
                 bind(stmt, 5, interaction.note)
             }
-        }
+        )
     }
 
     public func interactions(forContact contactID: UUID) throws -> [Interaction] {
@@ -167,24 +163,24 @@ public final class Repository: @unchecked Sendable {
     // MARK: - 联系人间关系
 
     public func saveRelationship(_ relationship: Relationship) throws {
-        let exists = try scalarBool(
-            "SELECT 1 FROM relationships WHERE id = ?", [relationship.id.uuidString]
-        )
-        if exists {
-            try exec("UPDATE relationships SET a_id = ?, b_id = ?, kind = ? WHERE id = ?") { stmt in
+        try upsert(
+            table: "relationships",
+            id: relationship.id,
+            updateSQL: "UPDATE relationships SET a_id = ?, b_id = ?, kind = ? WHERE id = ?",
+            insertSQL: "INSERT INTO relationships (id, a_id, b_id, kind) VALUES (?, ?, ?, ?)",
+            bindsUpdate: { stmt in
                 bind(stmt, 1, relationship.firstContactID.uuidString)
                 bind(stmt, 2, relationship.secondContactID.uuidString)
                 bind(stmt, 3, relationship.kind.rawValue)
                 bind(stmt, 4, relationship.id.uuidString)
-            }
-        } else {
-            try exec("INSERT INTO relationships (id, a_id, b_id, kind) VALUES (?, ?, ?, ?)") { stmt in
+            },
+            bindsInsert: { stmt in
                 bind(stmt, 1, relationship.id.uuidString)
                 bind(stmt, 2, relationship.firstContactID.uuidString)
                 bind(stmt, 3, relationship.secondContactID.uuidString)
                 bind(stmt, 4, relationship.kind.rawValue)
             }
-        }
+        )
     }
 
     public func relationships() throws -> [Relationship] {
@@ -218,10 +214,8 @@ public final class Repository: @unchecked Sendable {
 
     private static func contact(from row: Row) throws -> Contact {
         guard
-            let idString = row.string(0),
-            let id = UUID(uuidString: idString),
+            let id = row.uuid(0),
             let name = row.string(1),
-            let levelRaw = row.string(7),
             let created = row.double(8)
         else { throw RepositoryError.notFound }
         return Contact(
@@ -232,24 +226,21 @@ public final class Repository: @unchecked Sendable {
             company: row.string(4) ?? "",
             title: row.string(5) ?? "",
             note: row.string(6) ?? "",
-            level: Level(rawValue: levelRaw) ?? .normal,
+            level: try row.enumValue(7, column: "level", type: Level.self),
             createdAt: Date(timeIntervalSinceReferenceDate: created)
         )
     }
 
     private static func interaction(from row: Row) throws -> Interaction {
         guard
-            let idString = row.string(0),
-            let id = UUID(uuidString: idString),
-            let contactString = row.string(1),
-            let contactID = UUID(uuidString: contactString),
-            let kindRaw = row.string(2),
+            let id = row.uuid(0),
+            let contactID = row.uuid(1),
             let date = row.double(3)
         else { throw RepositoryError.notFound }
         return Interaction(
             id: id,
             contactID: contactID,
-            kind: InteractionKind(rawValue: kindRaw) ?? .other,
+            kind: try row.enumValue(2, column: "kind", type: InteractionKind.self),
             date: Date(timeIntervalSinceReferenceDate: date),
             note: row.string(4) ?? ""
         )
@@ -257,17 +248,15 @@ public final class Repository: @unchecked Sendable {
 
     private static func relationship(from row: Row) throws -> Relationship {
         guard
-            let idString = row.string(0),
-            let id = UUID(uuidString: idString),
-            let a = row.string(1), let aID = UUID(uuidString: a),
-            let b = row.string(2), let bID = UUID(uuidString: b),
-            let kindRaw = row.string(3)
+            let id = row.uuid(0),
+            let aID = row.uuid(1),
+            let bID = row.uuid(2)
         else { throw RepositoryError.notFound }
         return Relationship(
             id: id,
             firstContactID: aID,
             secondContactID: bID,
-            kind: RelationshipKind(rawValue: kindRaw) ?? .friend
+            kind: try row.enumValue(3, column: "kind", type: RelationshipKind.self)
         )
     }
 
@@ -280,6 +269,15 @@ public final class Repository: @unchecked Sendable {
         func double(_ i: Int32) -> Double? {
             guard sqlite3_column_type(stmt, i) != SQLITE_NULL else { return nil }
             return sqlite3_column_double(stmt, i)
+        }
+        func enumValue<T: RawRepresentable>(_ i: Int32, column: String, type: T.Type = T.self) throws -> T where T.RawValue == String {
+            guard let raw = string(i), let value = T(rawValue: raw) else {
+                throw RepositoryError.unknownEnumValue(column: column, raw: string(i) ?? "(null)")
+            }
+            return value
+        }
+        func uuid(_ i: Int32) -> UUID? {
+            string(i).flatMap(UUID.init(uuidString:))
         }
     }
 
@@ -351,6 +349,21 @@ public final class Repository: @unchecked Sendable {
                 else if rc == SQLITE_DONE { break }
                 else { throw RepositoryError.sqlite(lastError()) }
             }
+        }
+    }
+
+    /// 共用 upsert：主键存在 → 更新，否则插入。
+    private func upsert(
+        table: String,
+        id: UUID,
+        updateSQL: String,
+        insertSQL: String,
+        bindsUpdate: (OpaquePointer) -> Void,
+        bindsInsert: (OpaquePointer) -> Void
+    ) throws {
+        let exists = try scalarBool("SELECT 1 FROM \(table) WHERE id = ?", [id.uuidString])
+        try exec(exists ? updateSQL : insertSQL) { stmt in
+            (exists ? bindsUpdate : bindsInsert)(stmt)
         }
     }
 

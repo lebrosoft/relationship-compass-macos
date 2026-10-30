@@ -1,8 +1,9 @@
 import Foundation
 import Testing
-import PeoplebookKit
+@testable import PeoplebookKit
 
-/// 假数据剧本（票 05）：6 人自带全部"戏"，相对 now 生成便于固定时钟验证。
+/// 假数据剧本（票 06）：断言挂在日期计算接缝上（规格「Testing Decisions」），
+/// 相对 now 生成便于固定时钟验证。
 struct MockDataTests {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -38,26 +39,5 @@ struct MockDataTests {
         #expect(overdue("刘一舟") == true)   // 普通，120 天前
         #expect(overdue("赵晓萌") == false)  // 重点，2 天前
         #expect(overdue("孙明轩") == false)  // 冷淡，零互动
-    }
-
-    @Test("关系边：同事情谊、经介绍认识、前同事")
-    func relationshipEdges() {
-        let seed = MockData.seed(now: date(2026, 10, 30), calendar: calendar)
-        let byName = Dictionary(uniqueKeysWithValues: seed.contacts.map { ($0.name, $0) })
-        #expect(seed.relationships.count == 3)
-
-        let introducedVia = seed.relationships.filter { $0.kind == .introducedVia }
-        #expect(introducedVia.count == 1)
-        let ends = Set(introducedVia[0].endpointNames(seed.contacts))
-        #expect(ends == ["王芳", "赵晓萌"])
-        _ = byName
-    }
-}
-
-extension Relationship {
-    func endpointNames(_ contacts: [Contact]) -> [String] {
-        contacts
-            .filter { $0.id == firstContactID || $0.id == secondContactID }
-            .map(\.name)
     }
 }

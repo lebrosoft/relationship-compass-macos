@@ -1,7 +1,7 @@
 import SwiftUI
 import PeoplebookKit
 
-// MARK: - 根视图（三栏：搜索+列表 / 互动时间线 / 联系人资料）
+// MARK: - 根视图（规格「Implementation Decisions」：搜索框+列表 / 详情）
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
@@ -10,18 +10,40 @@ struct ContentView: View {
         @Bindable var model = model
         NavigationSplitView {
             ContactListPane()
-        } content: {
-            InteractionsPane()
         } detail: {
-            ContactProfilePane()
+            ContactDetailPane()
         }
         .sheet(isPresented: $model.importing) {
             ImportSheet()
         }
+        .alert("操作失败", isPresented: actionErrorBinding) {
+            Button("知道了") {}
+        } message: {
+            Text(model.actionErrorMessage ?? "")
+        }
+        .alert("本地数据库不可用", isPresented: persistenceWarningBinding) {
+            Button("知道了") {}
+        } message: {
+            Text(model.persistenceWarning ?? "")
+        }
+    }
+
+    private var actionErrorBinding: Binding<Bool> {
+        Binding(
+            get: { model.actionErrorMessage != nil },
+            set: { _ in model.clearActionError() }
+        )
+    }
+
+    private var persistenceWarningBinding: Binding<Bool> {
+        Binding(
+            get: { model.persistenceWarning != nil },
+            set: { _ in model.clearPersistenceWarning() }
+        )
     }
 }
 
-// MARK: - 左栏：搜索 + 联系人列表（逾期者红点）
+// MARK: - 左栏：搜索 + 联系人列表（逾期者红点、右键删除）
 
 struct ContactListPane: View {
     @Environment(AppModel.self) private var model
@@ -76,5 +98,12 @@ struct ContactListPane: View {
             }
         }
         .tag(result.contact.id)
+        .contextMenu {
+            Button(role: .destructive) {
+                model.deleteContact(result.contact)
+            } label: {
+                Label("删除联系人", systemImage: "trash")
+            }
+        }
     }
 }

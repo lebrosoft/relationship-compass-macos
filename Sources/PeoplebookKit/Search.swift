@@ -1,7 +1,7 @@
 import Foundation
 
-/// 搜索域规则（GLOSSARY：搜索命中姓名、公司、职位、备注；互动笔记为次级结果，
-/// 聚合到对应联系人下）。
+/// 搜索域规则（spec「Implementation Decisions」：搜索命中姓名、公司、职位、备注；
+/// 互动笔记为次级结果，聚合到对应联系人下）。
 public struct SearchResult: Identifiable, Hashable, Sendable {
     public let contact: Contact
     /// 该联系人的、笔记命中查询词的互动（次级命中）。

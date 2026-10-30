@@ -139,6 +139,8 @@ struct CSVImporterTests {
         #expect(!candidates[0].skip)
         #expect(!candidates[0].suspectedDuplicate)
         #expect(candidates[0].makeContact().level == .normal)
+        // 电话保真：落库的是原始串，不是归一化后的纯数字
+        #expect(candidates[0].makeContact().phone == "13300000011")
     }
 
     @Test("姓名为空的行被忽略")

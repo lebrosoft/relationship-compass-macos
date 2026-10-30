@@ -154,6 +154,11 @@ public struct Relationship: Identifiable, Hashable, Sendable, Codable {
         self.secondContactID = secondContactID
         self.kind = kind
     }
+
+    /// 该边对指定联系人而言的另一端。
+    public func otherEndpoint(of contactID: UUID) -> UUID {
+        firstContactID == contactID ? secondContactID : firstContactID
+    }
 }
 
 // MARK: - 提醒 / 日期计算
