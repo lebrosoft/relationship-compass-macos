@@ -2,7 +2,7 @@
 # 构建 人脉簿 (Peoplebook) 的可双击启动 .app
 # 用法: ./scripts/make-app.sh [输出目录] [--universal] [--dmg]
 #   --universal  构建 arm64 + x86_64 通用二进制（分发用）
-#   --dmg        额外打一个 人脉簿-macOS.dmg（UDZO 压缩镜像）
+#   --dmg        额外打一个 Peoplebook-macOS.dmg（UDZO 压缩镜像；ASCII 资产名，下载链接稳）
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -68,7 +68,7 @@ codesign --force --deep --sign - "$APP" 2>/dev/null || true
 echo "Built: $APP"
 
 if [[ "$MAKE_DMG" == 1 ]]; then
-  DMG="$OUT_DIR/$APP_NAME-macOS.dmg"
+  DMG="$OUT_DIR/Peoplebook-macOS.dmg"
   rm -f "$DMG"
   hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
   echo "DMG: $DMG"

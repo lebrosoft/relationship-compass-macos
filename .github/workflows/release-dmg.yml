@@ -45,15 +45,15 @@ jobs:
 
       - name: Verify DMG mounts
         run: |
-          hdiutil attach "dist/人脉簿-macOS.dmg" -nobrowse -quiet
+          hdiutil attach "dist/Peoplebook-macOS.dmg" -nobrowse -quiet
           test -d "/Volumes/人脉簿/人脉簿.app"
           hdiutil detach "/Volumes/人脉簿" -quiet
 
       - name: Upload artifact (always, incl. PR)
         uses: actions/upload-artifact@v4
         with:
-          name: 人脉簿-macOS-dmg
-          path: dist/人脉簿-macOS.dmg
+          name: Peoplebook-macOS-dmg
+          path: dist/Peoplebook-macOS.dmg
           if-no-files-found: error
 
       # 滚动 latest：删除重建（tag 随 commit 前移）。
@@ -71,18 +71,18 @@ jobs:
           NOTES=$(cat <<EOF
           **自动构建** #${RUN_NUMBER} · commit ${SHA::7}
 
-          - \`人脉簿-macOS.dmg\`：Universal（Apple Silicon / Intel 通用），要求 macOS 14.0+
+          - \`Peoplebook-macOS.dmg\`：Universal（Apple Silicon / Intel 通用），要求 macOS 14.0+
           - 对应源码：${GITHUB_SERVER_URL}/${REPO}/tree/${SHA}
 
           ### 安装
-          1. 下载 \`人脉簿-macOS.dmg\`，双击打开，把 **人脉簿.app** 拖进「应用程序」
+          1. 下载 \`Peoplebook-macOS.dmg\`，双击打开，把 **人脉簿.app** 拖进「应用程序」
           2. 首次打开若提示「无法验证开发者」（构建未公证）：右键 App → 打开；或执行
              \`xattr -dr com.apple.quarantine "/Applications/人脉簿.app"\`
 
           > 本 Release 由 CI 滚动更新：始终只保留最新构建，历史源码见上方 commit 链接。
           EOF
           )
-          gh release create latest "dist/人脉簿-macOS.dmg" \
+          gh release create latest "dist/Peoplebook-macOS.dmg" \
             --target "$SHA" \
             --title "人脉簿 最新构建 (#${RUN_NUMBER})" \
             --notes "$NOTES"
