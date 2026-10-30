@@ -56,7 +56,8 @@ jobs:
           path: dist/Peoplebook-macOS.dmg
           if-no-files-found: error
 
-      # 滚动 latest：删除重建（tag 随 commit 前移）。
+      # 滚动 latest：就地更新（移 tag + 改标题/notes + --clobber 覆盖资产），
+      # 避开「删 release 同 tag 立即重建」的最终一致性竞态与 GitHub delete API 的间歇 500。
       # 不标 prerelease——否则 /releases/latest 短链不会指向它。
       - name: Publish to rolling latest release
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -66,8 +67,7 @@ jobs:
           RUN_NUMBER: ${{ github.run_number }}
           REPO: ${{ github.repository }}
         run: |
-          gh release delete latest --cleanup-tag --yes 2>/dev/null \
-            || git push origin ":refs/tags/latest" 2>/dev/null || true
+          ASSET="dist/Peoplebook-macOS.dmg"
           NOTES=$(cat <<EOF
           **自动构建** #${RUN_NUMBER} · commit ${SHA::7}
 
@@ -82,7 +82,23 @@ jobs:
           > 本 Release 由 CI 滚动更新：始终只保留最新构建，历史源码见上方 commit 链接。
           EOF
           )
-          gh release create latest "dist/Peoplebook-macOS.dmg" \
-            --target "$SHA" \
-            --title "人脉簿 最新构建 (#${RUN_NUMBER})" \
-            --notes "$NOTES"
+          if gh release view latest -R "$REPO" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$REPO/git/refs/tags/latest" -f sha="$SHA" --jq '.object.sha[:7]'
+            # 清理历史遗留的错误名资产（例如早期 runner 剥 CJK 产生的 -macOS.dmg）
+            gh api "repos/$REPO/releases/tags/latest" --jq \
+              '.assets[] | select(.name != "Peoplebook-macOS.dmg") | .id' \
+              | while read -r id; do
+                  echo "delete stale asset $id"
+                  gh api -X DELETE "repos/$REPO/releases/assets/$id" 2>/dev/null || true
+                done
+            gh release edit latest -R "$REPO" \
+              --title "人脉簿 最新构建 (#${RUN_NUMBER})" --notes "$NOTES"
+            gh release upload latest -R "$REPO" "$ASSET" --clobber
+          else
+            # release 不存在但可能有残留 tag ref——先清掉，让 tag 落在当前 commit
+            gh api -X DELETE "repos/$REPO/git/refs/tags/latest" 2>/dev/null || true
+            gh release create latest -R "$REPO" "$ASSET" \
+              --target "$SHA" \
+              --title "人脉簿 最新构建 (#${RUN_NUMBER})" \
+              --notes "$NOTES"
+          fi
