@@ -1,0 +1,88 @@
+name: Release DMG
+
+# push/merge 到 master：构建验证 → 打包 Universal dmg → 删除并重建滚动 latest Release
+# PR：同样构建验证，dmg 只作为 workflow artifact（不动 Release）
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-dmg-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dmg:
+    name: Build & publish DMG
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Run tests (must be green before packaging)
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tail -5
+
+      - name: Build universal .app + .dmg
+        run: ./scripts/make-app.sh dist --universal --dmg
+
+      - name: Verify binary is universal
+        run: |
+          ARCHS=$(lipo -archs "dist/人脉簿.app/Contents/MacOS/PeoplebookApp")
+          echo "$ARCHS"
+          echo "$ARCHS" | grep -q arm64
+          echo "$ARCHS" | grep -q x86_64
+
+      - name: Verify DMG mounts
+        run: |
+          hdiutil attach "dist/人脉簿-macOS.dmg" -nobrowse -quiet
+          test -d "/Volumes/人脉簿/人脉簿.app"
+          hdiutil detach "/Volumes/人脉簿" -quiet
+
+      - name: Upload artifact (always, incl. PR)
+        uses: actions/upload-artifact@v4
+        with:
+          name: 人脉簿-macOS-dmg
+          path: dist/人脉簿-macOS.dmg
+          if-no-files-found: error
+
+      # 滚动 latest：删除重建（tag 随 commit 前移）。
+      # 不标 prerelease——否则 /releases/latest 短链不会指向它。
+      - name: Publish to rolling latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          RUN_NUMBER: ${{ github.run_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release delete latest --cleanup-tag --yes 2>/dev/null \
+            || git push origin ":refs/tags/latest" 2>/dev/null || true
+          NOTES=$(cat <<EOF
+          **自动构建** #${RUN_NUMBER} · commit ${SHA::7}
+
+          - \`人脉簿-macOS.dmg\`：Universal（Apple Silicon / Intel 通用），要求 macOS 14.0+
+          - 对应源码：${GITHUB_SERVER_URL}/${REPO}/tree/${SHA}
+
+          ### 安装
+          1. 下载 \`人脉簿-macOS.dmg\`，双击打开，把 **人脉簿.app** 拖进「应用程序」
+          2. 首次打开若提示「无法验证开发者」（构建未公证）：右键 App → 打开；或执行
+             \`xattr -dr com.apple.quarantine "/Applications/人脉簿.app"\`
+
+          > 本 Release 由 CI 滚动更新：始终只保留最新构建，历史源码见上方 commit 链接。
+          EOF
+          )
+          gh release create latest "dist/人脉簿-macOS.dmg" \
+            --target "$SHA" \
+            --title "人脉簿 最新构建 (#${RUN_NUMBER})" \
+            --notes "$NOTES"
