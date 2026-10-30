@@ -82,7 +82,7 @@ final class AppModel {
         relationships.filter { $0.firstContactID == contactID || $0.secondContactID == contactID }
     }
 
-    func contact(named id: UUID) -> Contact? {
+    func contact(id: UUID) -> Contact? {
         contacts.first { $0.id == id }
     }
 

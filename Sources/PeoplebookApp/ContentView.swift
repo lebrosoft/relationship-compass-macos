@@ -12,11 +12,7 @@ struct ContentView: View {
         } content: {
             InteractionsPane()
         } detail: {
-            ContentUnavailableView(
-                "联系人资料",
-                systemImage: "person.crop.circle",
-                description: Text("选择联系人后展示资料与关系")
-            )
+            ContactProfilePane()
         }
     }
 }
