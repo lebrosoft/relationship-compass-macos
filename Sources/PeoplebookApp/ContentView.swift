@@ -7,12 +7,16 @@ struct ContentView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        @Bindable var model = model
         NavigationSplitView {
             ContactListPane()
         } content: {
             InteractionsPane()
         } detail: {
             ContactProfilePane()
+        }
+        .sheet(isPresented: $model.importing) {
+            ImportSheet()
         }
     }
 }
@@ -40,6 +44,13 @@ struct ContactListPane: View {
             prompt: "姓名、公司、职位、备注或互动笔记"
         )
         .navigationTitle("人脉簿")
+        .toolbar {
+            Button {
+                model.importing = true
+            } label: {
+                Label("导入 CSV", systemImage: "square.and.arrow.down")
+            }
+        }
     }
 
     private func listRow(_ result: SearchResult) -> some View {
